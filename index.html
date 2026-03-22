@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Book Finder — Personalized</title>
+<meta name="description" content="Personalized Boekenzoeker-style finder with keyword search, filters, featured picks (multi-row grid), taste-boosted results, and Open Library covers.">
+<style>
+  /* ===== Sage‑green aesthetic ===== */
+  :root{
+    --sage-900:#2e473c; --sage-700:#3f6b58; --sage-600:#4f7f69;
+    --sage-500:#6b9f82; --sage-400:#8bb49e; --sage-050:#f4f7f5;
+    --bg:var(--sage-050); --ink:#18241e; --muted:#54665d; --line:#dfe7e3;
+    --chip:#ffffff; --chip-b:#cfe0d9; --btn:#3f6b58; --btn-d:#2e473c; --link:#2f6f58;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 Georgia,"Times New Roman",Times,serif;
+    /* Allow normal vertical page scroll, but never horizontal */
+    overflow-x:hidden;
+  }
+  header{
+    background:linear-gradient(var(--sage-700), var(--sage-600));
+    color:#fff; padding:12px 16px; border-bottom:3px solid var(--sage-900);
+  }
+  .brand{max-width:1100px; margin:0 auto; display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+  h1{margin:0; font-size:22px; letter-spacing:.2px}
+  .note{margin:4px 0 0 0; font-size:12px; opacity:.95}
+
+  main{max-width:1100px; width:100%; margin:0 auto; padding:0 16px 20px}
+  .layout{display:grid; grid-template-columns: 1fr 320px; gap:14px}
+  @media (max-width:1100px){ .layout{grid-template-columns: 1fr} }
+
+  .panel{
+    background:#fff; border:1px solid var(--line);
+    border-radius:10px; padding:12px;
+    box-shadow:0 8px 32px rgba(46,71,60,.05);
+  }
+  h2{margin:0 0 8px 0; font-size:16px; color:#fff; background:var(--sage-700); display:inline-block; padding:4px 8px; border-radius:6px}
+  .row{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+  .group{display:flex; flex-direction:column; gap:6px; min-width:220px}
+  label{font-weight:bold}
+  select, input[type="number"], input[type="text"]{
+    font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; color:#18241e;
+  }
+  .hint{font-size:12px; color:var(--muted)}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 12px; border:1px solid var(--chip-b); background:var(--chip);
+    border-radius:999px; font-size:13px; user-select:none; cursor:pointer;
+  }
+  .chip input{margin-right:6px}
+
+  .btn{
+    all:unset; cursor:pointer; padding:8px 12px; border-radius:8px;
+    border:1px solid var(--btn); color:#fff; background:var(--btn); font-weight:bold;
+  }
+  .btn.secondary{ background:#fff; color:var(--btn); border-color:var(--btn) }
+  .btn.ghost{ background:#fff; color:#18241e; border-color:var(--line) }
+  .btn:hover{ filter:brightness(1.03) }
+  .divider{height:1px; background:var(--line); margin:10px 0}
+
+  /* Segmented buttons for pages */
+  .seg{ display:flex; gap:8px; flex-wrap:wrap; }
+  .seg .segbtn{
+    all:unset; cursor:pointer; padding:8px 12px; border-radius:999px;
+    border:1px solid var(--chip-b); background:#fff; color:#18241e;
+  }
+  .seg .segbtn.active{ background:var(--sage-600); color:#fff; border-color:var(--sage-600); }
+
+  /* Two-row form grid: row1: Age/Type, row2: Results/Order */
+  .formgrid{ display:grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap:12px; }
+  @media (max-width:700px){ .formgrid{ grid-template-columns: 1fr; } }
+
+  /* Featured grid (like Boekenzoeker’s rows of cards) */
+  .featuredGrid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap:14px;
+  }
+  .fc{
+    border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px;
+  }
+  .fc .coverBox{
+    width:100%;
+    aspect-ratio: 2/3;               /* book jacket aspect */
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .fc .coverBox img{
+    max-width:100%; max-height:100%;
+    width:auto; height:auto;
+    object-fit:contain;               /* show the full cover (no cropping) */
+  }
+  .fct{font-weight:700; margin:8px 0 2px; color:#18241e}
+  .fca{font-size:13px; color:var(--muted)}
+
+  /* Results list */
+  .results{display:grid; gap:10px}
+  .card{border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px}
+  .title{font-weight:700; color:var(--link); text-decoration:underline; cursor:pointer; margin-bottom:4px}
+  .stats{font-family:ui-monospace, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; color:var(--muted)}
+  .tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px}
+  .tag{padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid var(--chip-b); background:#f7fbf9; color:#375d4e}
+  .thumb{
+    width:84px; aspect-ratio:2/3;
+    object-fit:contain; background:#fff;
+    border:1px solid var(--line); border-radius:6px; margin-right:8px
+  }
+
+  /* Reading list */
+  .list{display:grid; gap:8px}
+  .item{display:flex; gap:8px; align-items:center; border:1px solid var(--line); border-radius:8px; padding:8px; background:#fff}
+  .cover{width:44px; aspect-ratio:2/3; object-fit:contain; border:1px solid var(--line); border-radius:4px; background:#fff}
+  .item-title{font-weight:600}
+
+  /* Modal */
+  .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:20; background:rgba(0,0,0,.55)}
+  .modal.show{display:flex}
+  .sheet{
+    width:min(920px, 94vw); background:#fff; border-radius:12px; border:1px solid var(--line);
+    display:grid; grid-template-columns: 260px 1fr; gap:12px; padding:12px; box-shadow:0 30px 80px rgba(0,0,0,.35)
+  }
+  .sheet .bigcover{
+    width:100%; aspect-ratio:2/3; object-fit:contain; background:#fff;
+    border:1px solid var(--line); border-radius:8px;
+  }
+  .xbtn{position:absolute; top:12px; right:12px; background:#fff; border:1px solid var(--line); padding:6px 9px; border-radius:8px; cursor:pointer}
+  .xbtn:hover{filter:brightness(1.03)}
+  .kv{display:grid; grid-template-columns: 140px 1fr; gap:6px; font-size:13px}
+  .empty{color:#889c92}
+
+  footer{max-width:1100px; margin:0 auto; padding:0 16px 18px; color:var(--muted); font-size:12px}
+  a{color:var(--link)}
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Book Finder</h1>
+    </div>
+    <p class="note">made by the one and only</p>
+  </header>
+
+  <main>
+    <div class="layout">
+
+      <!-- LEFT: Featured + Filters + Results -->
+      <section>
+        <!-- Featured grid -->
+        <div class="panel" id="featuredPanel">
+          <h2>Featured for You</h2>
+          <div id="featuredGrid" class="featuredGrid" aria-live="polite"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Find Books</h2>
+
+          <!-- Keyword search -->
+          <div class="group" style="min-width:280px; margin-bottom:8px">
+            <label for="q">Search books (title / author / keywords)</label>
+            <input id="q" type="text" placeholder="e.g., Babel, dark academia, The Poppy War"/>
+            <div class="hint">Tip: with keywords, Age/Type subjects are ignored to avoid hiding adult titles.</div>
+          </div>
+
+          <!-- Two-row layout -->
+          <div class="formgrid">
+            <div class="group">
+              <label for="age">Age</label>
+              <select id="age">
+                <option value="0-3">0–3</option><option value="3-6">3–6</option>
+                <option value="6-8">6–8</option><option value="8-10">8–10</option>
+                <option value="10-12">10–12</option><option value="12-14">12–14</option>
+                <option value="14-16">14–16</option><option value="16-18" selected>16–18</option>
+              </select>
+              <div class="hint" id="ageHint">Thickness becomes available from age 6+.</div>
+            </div>
+
+            <div class="group">
+              <label for="type">Type</label>
+              <select id="type">
+                <option value="">—</option>
+                <option>Picture Book</option><option>Fiction</option><option>Non‑fiction</option>
+                <option>Poetry</option><option>Graphic Novel / Comics</option><option>Short Stories</option>
+              </select>
+            </div>
+
+            <div class="group">
+              <label for="count">Results (fetch pool)</label>
+              <input id="count" type="number" min="8" max="60" value="30"/>
+            </div>
+
+            <div class="group">
+              <label for="order">Order</label>
+              <select id="order">
+                <option value="popular" selected>Popular first</option>
+                <option value="new">New first</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <div class="group" style="flex:1 1 520px; min-width:320px">
+              <label>Theme (multi‑select)</label>
+              <div id="themes" class="chips"></div>
+            </div>
+
+            <div class="group" style="min-width:220px">
+              <label>Thickness</label>
+              <select id="thickness" disabled>
+                <option value="">—</option>
+                <option value="thin">Thin (&lt; 160 pp.)</option>
+                <option value="mid">Medium (160–300 pp.)</option>
+                <option value="thick">Thick (&gt; 300 pp.)</option>
+              </select>
+            </div>
+
+            <div class="group" style="min-width:260px">
+              <label>Extras (multi‑select)</label>
+              <div id="extras" class="chips"></div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="group" style="min-width:260px">
+            <label>Approx. Pages (click one)</label>
+            <div id="pagesSeg" class="seg">
+              <button class="segbtn active" data-pages="">Any</button>
+              <button class="segbtn" data-pages="short">Under 150</button>
+              <button class="segbtn" data-pages="mid">150–300</button>
+              <button class="segbtn" data-pages="long">300–500</button>
+              <button class="segbtn" data-pages="xl">500+</button>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <button class="btn" id="searchBtn">Search</button>
+            <button class="btn secondary" id="copyBtn">Copy List</button>
+            <button class="btn ghost" id="jsonBtn">Download JSON</button>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div class="panel" id="resultsPanel">
+          <h2>Results</h2>
+          <div id="results" class="results"></div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Reading list -->
+      <aside>
+        <div class="panel">
+          <h2>Your Reading List</h2>
+          <div id="list" class="list"></div>
+          <div class="divider"></div>
+          <div class="row">
+            <button class="btn secondary" id="printBtn">Print</button>
+            <button class="btn ghost" id="clearListBtn">Clear</button>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+  <footer>
+    <p>Data & covers: Open Library • Covers use full jacket (no cropping) • Featured wraps to multiple rows.</p>
+  </footer>
+
+  <!-- Modal -->
+  <div class="modal" id="modal">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+      <button class="xbtn" id="closeModal">Close ✕</button>
+      <img id="mCover" class="bigcover" alt="Book cover"/>
+      <div>
+        <h3 id="mTitle">—</h3>
+        <div class="stats" id="mMeta">—</div>
+        <p id="mDesc" class="tagline"></p>
+        <div class="kv">
+          <div>Subjects</div><div id="mSubjects" class="empty">—</div>
+          <div>First published</div><div id="mYear" class="empty">—</div>
+          <div>Open Library</div><div id="mLinkWrap"><a id="mLink" target="_blank" rel="noopener">View work</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* =========================================================
+   Book Finder — Personalized (Featured grid + full covers)
+   - Featured cards wrap to multiple rows (no horizontal page scroll).
+   - Cover images use object-fit: contain (show full jacket).
+   - Keyword search bypasses Age/Type constraints; includes relaxed fallback (e.g., “The Poppy War”).
+   ========================================================= */
+
+/* Shorter chip sets (multi-select) */
+const THEME_SET = [
+  "Animals","Friendship","Adventure","Magic","Mystery","Humor","Family",
+  "School","History","Science","Nature","Sports","Fantasy Worlds","Coming of Age",
+  "Dark Academia","Magical Realism","Dystopia","Contemporary"
+];
+const EXTRAS_SET = [
+  "Classics","Film/TV Adaptation","Easy to Read","Award Winner",
+  "Illustrated","Series Starter","Standalone","Translated"
+];
+const SYNONYMS = {
+  "Animals": ['subject:"animals"','animal stories','wildlife','pets'],
+  "Friendship": ['subject:"friendship"','bonds','found family','loyalty'],
+  "Adventure": ['subject:"adventure"','quest','journey','expedition','road trip'],
+  "Magic": ['subject:"magic"','spells','wizards','witches','enchantment'],
+  "Mystery": ['subject:"mystery"','detective','whodunit','clues'],
+  "Humor": ['subject:"humor"','funny','comedy'],
+  "Family": ['subject:"family"','siblings','parents','home life'],
+  "School": ['subject:"schools"','classmates','teachers','bullying'],
+  "History": ['subject:"history"','historical'],
+  "Science": ['subject:"science"','STEM','experiments'],
+  "Nature": ['nature','outdoors','wild places','forests'],
+  "Sports": ['subject:"sports"','competition','team'],
+  "Fantasy Worlds": ['epic fantasy','secondary world','kingdom'],
+  "Coming of Age": ['coming of age','growing up','teen life'],
+  "Dark Academia": ['dark academia','classics department','elite university','dead poets'],
+  "Magical Realism": ['magical realism','surreal','dreamlike','uncanny'],
+  "Dystopia": ['dystopia','post-apocalyptic','totalitarian','collapse'],
+  "Contemporary": ['contemporary','modern life','present day'],
+  "Classics": ['classics','canonical','timeless'],
+  "Film/TV Adaptation": ['film adaptation','movie tie-in','television'],
+  "Easy to Read": ['easy to read','reluctant readers','hi-lo','accessible'],
+  "Award Winner": ['award winning','prize winner','medal'],
+  "Illustrated": ['illustrated','pictures','artwork'],
+  "Series Starter": ['book 1','series opener','first in series'],
+  "Standalone": ['standalone','self-contained'],
+  "Translated": ['translated','in translation']
+};
+const TYPE_SUBJECT_MAP = {
+  "Picture Book": ["picture books","picture book"],
+  "Fiction": ["fiction"],
+  "Non‑fiction": ["nonfiction","non-fiction"],
+  "Poetry": ["poetry"],
+  "Graphic Novel / Comics": ["graphic novels","comics"],
+  "Short Stories": ["short stories"]
+};
+const AGE_SUBJECT_MAP = {
+  "0-3":  ["picture books","juvenile fiction"],
+  "3-6":  ["picture books","juvenile fiction"],
+  "6-8":  ["children","juvenile fiction"],
+  "8-10": ["children","juvenile fiction"],
+  "10-12":["juvenile fiction"],
+  "12-14":["young adult fiction","teen"],
+  "14-16":["young adult fiction","teen"],
+  "16-18":["young adult fiction"]
+};
+
+/* Taste profile for boosting + Featured */
+const TASTE = {
+  authors: ["V.E. Schwab","Emily Austen","R.F. Kuang","Donna Tartt","Haruki Murakami","Khaled Hosseini","Virginia Woolf"],
+  vibes: ["dark academia","historical fiction","magical realism","contemporary","dystopia","science fiction","YA","mystery","fantasy"],
+  mustReads: [
+    {t:"The Book Thief", a:"Markus Zusak"},
+    {t:"If We Were Villains", a:"M.L. Rio"},
+    {t:"Pachinko", a:"Min Jin Lee"},
+    {t:"Tomorrow, and Tomorrow, and Tomorrow", a:"Gabrielle Zevin"},
+    {t:"Almond", a:"Sohn Won-pyung"},
+    {t:"Open Water", a:"Caleb Azumah Nelson"},
+    {t:"I Who Have Never Known Men", a:"Jacqueline Harpman"},
+    {t:"Stoner", a:"John Williams"},
+    {t:"The Perks of Being a Wallflower", a:"Stephen Chbosky"},
+    {t:"Where the Crawdads Sing", a:"Delia Owens"},
+    {t:"The Folk of the Air", a:"Holly Black"},
+    {t:"If Cats Disappeared from the World", a:"Genki Kawamura"},
+    {t:"The Secret Life of Bees", a:"Sue Monk Kidd"},
+    {t:"Someone Who Will Love You in All Your Damaged Glory", a:"Raphael Bob-Waksberg"},
+    {t:"Vicious", a:"V.E. Schwab"},
+    {t:"The Invisible Life of Addie LaRue", a:"V.E. Schwab"},
+    {t:"Everyone in This Room Will Someday Be Dead", a:"Emily Austin"},
+    {t:"Interesting Facts About Space", a:"Emily Austin"},
+    {t:"The Poppy War", a:"R.F. Kuang"},
+    {t:"Babel", a:"R.F. Kuang"},
+    {t:"The Secret History", a:"Donna Tartt"},
+    {t:"The Goldfinch", a:"Donna Tartt"},
+    {t:"The Little Friend", a:"Donna Tartt"},
+    {t:"Kafka on the Shore", a:"Haruki Murakami"},
+    {t:"Norwegian Wood", a:"Haruki Murakami"},
+    {t:"The Kite Runner", a:"Khaled Hosseini"},
+    {t:"A Thousand Splendid Suns", a:"Khaled Hosseini"},
+    {t:"The Waves", a:"Virginia Woolf"},
+    {t:"To the Lighthouse", a:"Virginia Woolf"}
+  ]
+};
+
+/* Build chips */
+const themesEl = document.getElementById('themes');
+const extrasEl = document.getElementById('extras');
+function chip(label, idPrefix, checked=false){
+  const id = `${idPrefix}-${label.replace(/\s+/g,'-').toLowerCase()}`;
+  const span = document.createElement('span');
+  span.className='chip';
+  span.innerHTML = `<label for="${id}" style="display:inline-flex;align-items:center;gap:6px">
+      <input id="${id}" type="checkbox" ${checked?'checked':''}/> <span>${label}</span>
+  </label>`;
+  return span;
+}
+THEME_SET.forEach((t,i)=> themesEl.appendChild(chip(t,'theme', i<3)));
+EXTRAS_SET.forEach(e=> extrasEl.appendChild(chip(e,'extra', false)));
+
+/* DOM refs */
+const qEl      = document.getElementById('q');
+const ageEl    = document.getElementById('age');
+const typeEl   = document.getElementById('type');
+const countEl  = document.getElementById('count');
+const orderEl  = document.getElementById('order');
+const thickEl  = document.getElementById('thickness');
+const resultsEl= document.getElementById('results');
+const listEl   = document.getElementById('list');
+const ageHint  = document.getElementById('ageHint');
+
+/* Pages segmented control */
+const pagesSeg=document.getElementById('pagesSeg');
+let pagesWanted = ""; // "", "short", "mid", "long", "xl"
+pagesSeg.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.segbtn'); if(!btn) return;
+  [...pagesSeg.querySelectorAll('.segbtn')].forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  pagesWanted = btn.dataset.pages || "";
+});
+
+/* Thickness only for age ≥ 6 */
+function syncThickness(){
+  const a=ageEl.value;
+  const enabled = !/^0-3|3-6$/.test(a);
+  thickEl.disabled = !enabled;
+  ageHint.textContent = enabled ? "Thickness filter is active." : "Thickness becomes available from age 6+.";
+}
+ageEl.addEventListener('change', syncThickness);
+syncThickness();
+
+/* Helpers */
+const clamp = (x,a,b)=> Math.max(a, Math.min(b, x));
+function escapeHtml(s){ return (s??'').replace(/[&<>"]/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[m]); }
+function shuffle(a){ const x=[...a]; for(let i=x.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [x[i],x[j]]=[x[j],x[i]]; } return x; }
+function interleave(a,b){ const out=[]; const m=Math.min(a.length,b.length); for(let i=0;i<m;i++) out.push(a[i],b[i]); return out.concat(a.slice(m),b.slice(m)); }
+function notify(msg){
+  const n=document.createElement('div');
+  n.textContent=msg; n.style.position='fixed'; n.style.right='12px'; n.style.bottom='12px';
+  n.style.padding='8px 12px'; n.style.background='#fff'; n.style.border='1px solid var(--line)';
+  n.style.borderRadius='8px'; n.style.boxShadow='0 8px 22px rgba(0,0,0,.15)';
+  document.body.appendChild(n); setTimeout(()=>n.remove(), 1400);
+}
+function getChecked(container){
+  return [...container.querySelectorAll('input[type=checkbox]:checked')]
+         .map(i=>i.nextElementSibling.textContent.trim());
+}
+function expandTerms(label){
+  const base = [label.toLowerCase()];
+  const syns = SYNONYMS[label] || [];
+  return [...new Set([...base, ...syns])];
+}
+function coverURL(d){
+  if (d.cover_i) return `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`;
+  if (d.isbn && d.isbn.length) return `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(d.isbn[0])}-M.jpg`;
+  return '';
+}
+
+/* Query builder: with keywords, SKIP Age/Type subjects so adult titles (e.g., The Poppy War) appear */
+function buildQuery(){
+  const age = ageEl.value;
+  const type= typeEl.value;
+  const themes = getChecked(themesEl);
+  const extras = getChecked(extrasEl);
+  const kw = (qEl.value||'').trim();
+
+  const qParts = ['language:eng'];
+
+  if (!kw){
+    (AGE_SUBJECT_MAP[age]||[]).forEach(s => qParts.push(`subject:"${s}"`));
+    (TYPE_SUBJECT_MAP[type]||[]).forEach(s => qParts.push(`subject:"${s}"`));
+  }
+
+  themes.forEach(t=>{
+    const or = expandTerms(t).map(w=> /subject:/.test(w) ? w : `"${w}"`).join(' OR ');
+    qParts.push(`(${or})`);
+  });
+  extras.forEach(x=>{
+    const or = expandTerms(x).map(w=> /subject:/.test(w) ? w : `"${w}"`).join(' OR ');
+    qParts.push(`(${or})`);
+  });
+
+  if (kw){
+    const tokens = kw.split(/\s+/).filter(Boolean).slice(0,6);
+    const or = [`"${kw}"`, ...tokens.map(t=>`"${t}"`)].join(' OR ');
+    qParts.push(`(${or})`);
+  } else if (!themes.length && !extras.length){
+    qParts.push('(story OR stories OR tale)');
+  }
+
+  const q = qParts.join(' ');
+  const params = new URLSearchParams({
+    q,
+    limit: String( clamp( Number(countEl.value||'30'), 8, 60) ),
+    fields: [
+      'key','title','author_name','first_publish_year','edition_count',
+      'ratings_average','ratings_count','subject','cover_i','isbn',
+      'number_of_pages_median'
+    ].join(',')
+  });
+
+  return `https://openlibrary.org/search.json?${params.toString()}`;
+}
+
+/* Popularity + Taste boost */
+function popScore(d){
+  const rA = isFinite(d.ratings_average)? d.ratings_average: 0;
+  const rC = isFinite(d.ratings_count)?   d.ratings_count  : 0;
+  const ed = d.edition_count || 0;
+  return rA * (Math.log(rC+1)+1) + ed*0.02;
+}
+function tasteScore(d){
+  let score = 0;
+  const authors = (d.author_name||[]).join(' | ').toLowerCase();
+  const subj = (d.subject||[]).map(s=>String(s).toLowerCase());
+  for (const fav of TASTE.authors){ if (authors.includes(fav.toLowerCase())) { score += 120; break; } }
+  for (const vibe of TASTE.vibes){ if (subj.some(s=> s.includes(vibe.toLowerCase()))) score += 20; }
+  const rc = d.ratings_count||0, ed = d.edition_count||0;
+  if (rc===0 && ed<=1) score -= 10;
+  return score;
+}
+
+/* Search + relaxed fallback */
+async function runSearch(){
+  resultsEl.innerHTML = `<div class="card">Searching Open Library…</div>`;
+  try{
+    const url = buildQuery();
+    let docs = await fetchDocs(url);
+
+    const thickness = document.getElementById('thickness').value;
+    const seen = new Set();
+    let filtered = docs.filter(d=>{
+      const k=d.key||d.title; if(!k||seen.has(k)) return false; seen.add(k);
+      const okCover = d.cover_i || (d.isbn && d.isbn.length);
+      const okThick = thicknessOk(d.number_of_pages_median, thickness);
+      const okPages = pagesFilter(d.number_of_pages_median, pagesWanted);
+      return d.title && okCover && okThick && okPages;
+    });
+
+    const kw = (qEl.value||'').trim();
+    if (!filtered.length && kw){
+      const params = new URLSearchParams({
+        q: `language:eng "${kw}"`,
+        limit: String( clamp( Number(countEl.value||'30'), 8, 60) ),
+        fields: 'key,title,author_name,first_publish_year,edition_count,ratings_average,ratings_count,subject,cover_i,isbn,number_of_pages_median'
+      });
+      const url2 = `https://openlibrary.org/search.json?${params.toString()}`;
+      docs = await fetchDocs(url2);
+      const seen2 = new Set();
+      filtered = docs.filter(d=>{
+        const k=d.key||d.title; if(!k||seen2.has(k)) return false; seen2.add(k);
+        const okCover = d.cover_i || (d.isbn && d.isbn.length);
+        const okPages = pagesFilter(d.number_of_pages_median, pagesWanted);
+        return d.title && okCover && okPages;
+      });
+    }
+
+    let items = [...filtered];
+    items.sort((a,b)=> (popScore(b)+tasteScore(b)) - (popScore(a)+tasteScore(a)) );
+
+    const order = orderEl.value;
+    if (order==='new')   items.sort((a,b)=> (b.first_publish_year||0)-(a.first_publish_year||0));
+    if (order==='mixed') items = interleave(items, shuffle([...items]));
+
+    const view = items.map(toVM);
+
+    const mustKeys = new Set(TASTE.mustReads.map(m=> (m.t+"|"+m.a).toLowerCase() ));
+    view.sort((a,b)=> (mustKeys.has((a.title+"|"+(a.authors.split(',')[0]||'')).toLowerCase())? -1:0)
+                    - (mustKeys.has((b.title+"|"+(b.authors.split(',')[0]||'')).toLowerCase())? -1:0));
+
+    renderResults(view);
+  }catch(e){
+    resultsEl.innerHTML = `<div class="card">Couldn’t load results. Try again. (${escapeHtml(e.message)})</div>`;
+  }
+}
+
+async function fetchDocs(url){
+  const res = await fetch(url, { headers:{ 'User-Agent':'Book-Finder (educational demo)' } });
+  if (!res.ok) throw new Error('Search error');
+  const data = await res.json();
+  return data.docs || [];
+}
+
+function thicknessOk(pages, sel){
+  if (!sel || !pages) return true;
+  if (sel==='thin') return pages < 160;
+  if (sel==='mid')  return pages >=160 && pages <= 300;
+  if (sel==='thick')return pages > 300;
+  return true;
+}
+function pagesFilter(pages, sel){
+  if (!sel || !pages) return true;
+  if (sel==="short") return pages < 150;
+  if (sel==="mid")   return pages >=150 && pages <= 300;
+  if (sel==="long")  return pages > 300 && pages <= 500;
+  if (sel==="xl")    return pages > 500;
+  return true;
+}
+
+function toVM(d){
+  const title = d.title || 'Untitled';
+  const authors = (d.author_name||[]).join(', ');
+  const year = d.first_publish_year || '—';
+  const subjects = (d.subject||[]).slice(0,10);
+  const cover = coverURL(d);
+  const stats = `editions: ${d.edition_count||0} • rating: ${isFinite(d.ratings_average)? d.ratings_average.toFixed(2) : '—'} (${d.ratings_count||0})`;
+  const pages = d.number_of_pages_median ? `~${d.number_of_pages_median} pp.` : '';
+  const blurb = `A ${subjects[0] ? subjects[0].toLowerCase()+', ' : ''}${authors? 'by '+authors: 'unknown author'}; first published ${year}.`;
+  const url = `https://openlibrary.org${d.key}`;
+  return { title, authors, year, subjects, cover, stats, pages, blurb, url, raw:d };
+}
+
+function renderResults(list){
+  resultsEl.innerHTML='';
+  if (!list.length) { resultsEl.innerHTML = `<div class="card">No matches — try fewer filters.</div>`; return; }
+  list.forEach(b=>{
+    const div=document.createElement('div'); div.className='card';
+    const img = b.cover ? `<img class="thumb" alt="Cover" src="${escapeHtml(b.cover)}" onerror="this.style.visibility='hidden'"/>` : '';
+    div.innerHTML = `
+      <div class="row" style="align-items:flex-start">
+        ${img}
+        <div style="flex:1 1 auto">
+          <div class="title">${escapeHtml(b.title)}</div>
+          <div class="stats">${escapeHtml(b.authors||'Unknown')} • ${escapeHtml(b.pages||'')} ${b.pages?'•':''} ${escapeHtml(b.stats)}</div>
+          <div class="tags">${b.subjects.map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>
+          <div class="row" style="margin-top:6px">
+            <button class="btn secondary addBtn">Add to Reading List</button>
+            <a href="${escapeHtml(b.url)}" class="btn ghost" target="_blank" rel="noopener">Open Library</a>
+          </div>
+        </div>
+      </div>
+    `;
+    div.querySelector('.title').onclick=()=> openModal(b);
+    div.querySelector('.addBtn').onclick=()=> addToList(b);
+    resultsEl.appendChild(div);
+  });
+}
+
+/* Modal */
+const modal=document.getElementById('modal');
+const closeModal=()=>modal.classList.remove('show');
+document.getElementById('closeModal').onclick=closeModal;
+modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+
+function openModal(b){
+  document.getElementById('mTitle').textContent = b.title;
+  document.getElementById('mMeta').textContent  = `${b.authors||'Unknown'} • ${b.pages||''} ${b.pages?'•':''} ${b.stats}`;
+  document.getElementById('mDesc').textContent  = b.blurb;
+  document.getElementById('mYear').textContent  = b.year || '—';
+  document.getElementById('mSubjects').innerHTML= b.subjects.length? b.subjects.map(escapeHtml).join(', ') : '—';
+  document.getElementById('mLink').href = b.url;
+  const img = document.getElementById('mCover');
+  img.src = b.cover ? b.cover.replace('-M.jpg','-L.jpg') : '';
+  img.alt = `Cover: ${b.title}`;
+  modal.classList.add('show');
+}
+
+/* Reading list */
+let store = JSON.parse(localStorage.getItem('reading_list')||'[]');
+function save(){ localStorage.setItem('reading_list', JSON.stringify(store)); }
+function renderList(){
+  listEl.innerHTML='';
+  if (!store.length){ listEl.innerHTML = `<div class="item"><div class="item-title">Nothing yet.</div></div>`; return; }
+  store.forEach((b,i)=>{
+    const it=document.createElement('div'); it.className='item';
+    const img = b.cover ? `<img class="cover" alt="Cover" src="${escapeHtml(b.cover)}" onerror="this.style.visibility='hidden'"/>` : '';
+    it.innerHTML = `
+      ${img}
+      <div style="flex:1 1 auto">
+        <div class="item-title">${escapeHtml(b.title)}</div>
+        <div class="stats">${escapeHtml(b.authors||'Unknown')} • ${escapeHtml(b.pages||'')}</div>
+        <a href="${escapeHtml(b.url)}" target="_blank" rel="noopener">Open Library</a>
+      </div>
+      <button class="btn ghost rem">Remove</button>
+    `;
+    it.querySelector('.rem').onclick=()=>{ store.splice(i,1); save(); renderList(); };
+    listEl.appendChild(it);
+  });
+}
+function addToList(b){
+  if (store.find(x=>x.url===b.url)) return notify('Already on your list');
+  store.push(b); save(); renderList(); notify('Added!');
+}
+document.getElementById('clearListBtn').onclick=()=>{ store=[]; save(); renderList(); };
+document.getElementById('printBtn').onclick=()=> window.print();
+
+/* Export / copy */
+document.getElementById('copyBtn').onclick=()=>{
+  const arr = window._last || [];
+  const list = arr && arr.length ? arr : [];
+  if (!list.length) return notify('Search first');
+  const txt = list.map((b,i)=>`${i+1}. ${b.title} — ${b.authors}\n   ${b.pages} | ${b.stats}\n   ${b.url}\n`).join('\n');
+  navigator.clipboard.writeText(txt).then(()=>notify('Copied!')).catch(()=>notify('Could not copy.'));
+};
+document.getElementById('jsonBtn').onclick=()=>{
+  const arr = window._last || [];
+  const list = arr && arr.length ? arr : [];
+  if (!list.length) return notify('Search first');
+  const blob = new Blob([JSON.stringify(list, null, 2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='books.json'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+/* Search */
+document.getElementById('searchBtn').onclick=runSearch;
+document.getElementById('q').addEventListener('keydown', (e)=>{ if(e.key==='Enter') runSearch(); });
+
+/* ----- Featured grid (multi-row, full covers) ----- */
+const featuredGrid = document.getElementById('featuredGrid');
+async function renderFeatured(){
+  featuredGrid.innerHTML = '';
+  const picks = TASTE.mustReads.slice(0, 24); // show plenty; grid wraps to next lines
+  for (let i=0;i<picks.length;i++){
+    const m = picks[i];
+    const card = document.createElement('div'); card.className='fc';
+    card.innerHTML = `
+      <div class="coverBox"><img alt="Book cover" id="fimg-${i}" /></div>
+      <div class="fct">${escapeHtml(m.t)}</div>
+      <div class="fca">${escapeHtml(m.a)}</div>
+    `;
+    card.onclick = ()=>{ qEl.value = `${m.t} ${m.a}`; runSearch(); };
+    featuredGrid.appendChild(card);
+    // Fetch cover
+    try{
+      const url = `https://openlibrary.org/search.json?` + new URLSearchParams({ q: `${m.t} ${m.a}`, limit: '1', fields: 'cover_i,isbn' });
+      const r = await fetch(url,{ headers:{'User-Agent':'Book-Finder (educational demo)'}});
+      if(r.ok){
+        const j = await r.json();
+        const d = (j.docs||[])[0];
+        const c = d ? (d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg`
+                  : (d.isbn && d.isbn.length ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(d.isbn[0])}-L.jpg` : '')) : '';
+        if (c){ document.getElementById(`fimg-${i}`).src=c; }
+      }
+    }catch{ /* ignore */ }
+  }
+}
+
+/* Boot */
+renderFeatured();
+runSearch();
+renderList();
+
+</script>
+</body>
+</html>
